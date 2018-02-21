@@ -52,7 +52,7 @@ use "${origdat}/gus1.dta", clear
 * inspect data
 describe                   // show all variables contained in data
 notes                      // show all notes contained in data
-codebook, problems         // potential problems in dataset
+*codebook, problems         // potential problems in dataset
 duplicates report Idnumber // duplicates?
 
 
@@ -121,7 +121,8 @@ keep Idnumber   /// child's person ID
 	 MaHalc04   ///
 	 MaHcig01   ///
 	 MaHdrg*    ///
-	 DaCtyp11   //
+	 DaCtyp11   ///
+	 
 	 
 	 
 * merge cognitive measures at age 3 and 5
@@ -159,9 +160,11 @@ bysort Idnumber: gen wave=_n
 * generate variables for time-varying characteristics
 for any mothres fullemp partemp onleave marstat mhealth chealth nrsib move   /// 
         mnssec pnssec hhinc incsup homeown pempl pedu regtyp depriv hboard   ///
-        concdev:                                                             ///
+        concdev newpartner newbaby othchild childleft:                                                             ///
         gen X=.
-
+for any newpartner newbaby othchild childleft:                                                             ///
+        gen X=.
+		
 label val mothres DAHGRSP0
 label val marstat LABE
 label val mhealth MAHPGN01
@@ -219,8 +222,31 @@ drop M`i'West01 M`i'West02 M`i'West03 D`i'HGnmsb D`i'HGrsp01 D`i'HGmr2       ///
 local j=`j'+1
 }
 
-*MbOve01 MbOve07 MbOve08 MbOve09
 
+
+* MbOve01 MbOve07 MbOve08 MbOve09: not included in wave 1 and 6
+/// M`i'Ove01 new parent/partner 
+//M`i'Ove07 new baby 
+///M`i'Ove08 other child in HH 
+//M`i'Ove09 other child left HH 
+local j=2
+foreach i in b c d e  {
+sort Idnumber 
+merge m:1 Idnumber using "${origdat}/gus`j'.dta", /// Sweep 2-5 
+	keepusing(M`i'Ove01 M`i'Ove07 M`i'Ove08 M`i'Ove09) ///
+	keep(1 3) nogen nolabel
+
+replace newpartner=M`i'Ove01 if wave==`j'
+replace newbaby=M`i'Ove07 if wave==`j'
+replace othchild=M`i'Ove08 if wave==`j'
+replace childleft=M`i'Ove09 if wave==`j'
+
+drop M`i'Ove01 M`i'Ove07 M`i'Ove08 M`i'Ove09
+
+local j=`j'+1
+}
+
+* create variable for missing waves
 * merge region type and deprivation index (which change name over sweeps)
 local j=1
 foreach i in a b {
@@ -847,7 +873,32 @@ grc1leg2  	boxemosymp5.gph boxconductprob5.gph boxhyper5.gph  		///
 			boxpeerprob5.gph boxprosoc5.gph boxtotalsdq5.gph, 		///
 			title("Distribution of Difficulties in Year 5") 		///
 			saving(boxall_sibbirth5, replace)
-
+			
+			
+			
+			
+*alternatives speichern  
+foreach var of varlist	emosymp5 conductprob5 hyper5 				///
+						peerprob5 prosoc5 totalsdq5 {
+local z: variable label `var'
+graph box 	`var', 													///
+			over(sibbirth, relabel(1 "No sibling" 2 "Sibling")) 	///
+			over(kidmale0, relabel(1 "Female" 2 "Male")) 			///
+			ytitle("") 												/// 
+			asyvar bar(1, color(sand)) marker(1, mcol (sand))		///
+			bar(2, color(emerald)) marker(2, mcol(emerald))			///
+			title ("`z'") ///
+			saving(box`var', replace) 
+}
+* combine boxplots year 5
+grc1leg2  	boxemosymp5.gph boxconductprob5.gph boxhyper5.gph  		///
+			boxpeerprob5.gph boxprosoc5.gph boxtotalsdq5.gph, 		///
+			title("Distribution of Difficulties in Year 5") 		///
+			name(boxall_sibbirth5, replace)
+graph export "$figures/boxall_sibbirth5$.png"
+			
+			
+			
 * draw boxplot over Sibbirth and Sex year 6
 foreach var of varlist	emosymp6 conductprob6 hyper6 				///
 						peerprob6 prosoc6 totalsdq6 {
