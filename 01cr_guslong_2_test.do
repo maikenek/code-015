@@ -158,12 +158,13 @@ bysort Idnumber: gen wave=_n
 
 
 * generate variables for time-varying characteristics
-for any mothres fullemp partemp onleave marstat mhealth chealth nrsib move   /// 
-        mnssec pnssec hhinc incsup homeown pempl pedu regtyp depriv hboard   ///
-        concdev newpartner newbaby othchild childleft:                                                             ///
+for any mothres fullemp partemp onleave marstat mhealth chealth nrsib move  /// 
+        mnssec pnssec hhinc incsup homeown pempl pedu regtyp depriv hboard  ///
+        concdev emosymp5 emosymp6 conductprob5 conductprob6 hyper5 hyper6 	///
+		peerprob5 peerprob6 prosoc5 prosoc6 totalsdq5 totalsdq6 			///
+		newpartner newbaby othchild childleft:                                                             ///
         gen X=.
-for any newpartner newbaby othchild childleft:                                                             ///
-        gen X=.
+
 		
 label val mothres DAHGRSP0
 label val marstat LABE
@@ -176,6 +177,7 @@ label val pedu    DAYEDU03
 label val mnssec  DAMSEC01
 label val pnssec  DAYSEC01
 label val hboard  ALAHBDBC
+
 
 forval i=2/10 {
 gen hhmem`i'=.
@@ -221,7 +223,37 @@ drop M`i'West01 M`i'West02 M`i'West03 D`i'HGnmsb D`i'HGrsp01 D`i'HGmr2       ///
 
 local j=`j'+1
 }
+	
 
+* rename SDQ-Score
+local j=5
+foreach i in e f {
+sort Idnumber 
+
+replace emosymp`j'=D`i'Dsdem1 if wave==`j'
+replace conductprob`j'=D`i'Dsdco1 if wave==`j'
+replace hyper`j'=D`i'Dsdhy1 if wave==`j'
+replace peerprob`j'=D`i'Dsdpr1 if wave==`j'
+replace prosoc`j'=D`i'Dsdps1 if wave==`j'
+replace totalsdq`j'=D`i'Dsdto1 if wave==`j'
+
+drop D`i'Dsdem1 D`i'Dsdco1 D`i'Dsdhy1 D`i'Dsdpr1 D`i'Dsdps1 D`i'Dsdto1
+local j=`j'+1
+}
+
+* lable SDQ-Score-variables
+label var emosymp5 "Emotional symptoms score"
+label var emosymp6 "Emotional symptoms score"
+label var conductprob5 "Conduct problems score"
+label var conductprob6 "Conduct problems score"
+label var hyper5 "Hyper-activity score"
+label var hyper6 "Hyper-activity score"
+label var peerprob5 "Peer problems score"
+label var peerprob6 "Peer problems score"
+label var prosoc5 "Pro-social score"
+label var prosoc6 "Pro-social score"
+label var totalsdq5 "Total difficulties score"
+label var totalsdq6 "Total difficulties score"
 
 
 * MbOve01 MbOve07 MbOve08 MbOve09: not included in wave 1 and 6
@@ -386,7 +418,7 @@ local j=`j'+1
 * inspect data
 describe                        // show all variables contained in data
 notes                           // show all notes contained in data
-codebook, problems              // potential problems in dataset
+* codebook, problems              // potential problems in dataset
 duplicates report Idnumber      // duplicates?
 duplicates report Idnumber wave 
 
@@ -804,46 +836,58 @@ drop aux
 
 replace yrbrn=0 if yrbrn==.
 
+bysort yrbrn: sum NamVAS5 PicSAS5 if wave==5 
 
+*** alternative variable: new baby in household
+sort Id wave
+gen sibbirth_2=0
+replace sibbirth_2=1 if newbaby==1 &nrsib<.
+replace sibbirth_2=1 if sibbirth_2[_n-1]==1 & Id==Id[_n-1]
 
-bysort yrbrn: sum NamVAS5 PicSAS5 if wave==5 & DaHGbord==
-
-
-
-
+bysort Idnumber: egen aux2=min(wave) if sibbirth_2==1
+bysort Idnumber: egen yrbrn_2=max(aux2)
+replace yrbrn_2=0 if yrbrn_2==.
+drop aux2
 
 
 * dummy variable for each year: birth of sibling in year i 
 sort Id wave
 forval i=1/6 {
-gen sibbirth`i'=0 if wave==`i'  
-replace sibbirth`i'=1 if sibbirth==1 & sibbirth[_n-1]==0 & wave==`i'   
+gen sibbirth`i'=. if wave==`i'  
+replace sibbirth`i'=0 if sibbirth==0 & wave==`i'   
+replace sibbirth`i'=1 if sibbirth==1 & wave==`i'   
 }
+sort Id wave
+forval i=2/5 {
+gen sibbirth_2`i'=. if wave==`i'  
+replace sibbirth_2`i'=0 if sibbirth_2==0 & wave==`i'   
+replace sibbirth_2`i'=1 if sibbirth_2==1 & wave==`i'   
+}
+*** comparison between variables 
+*how many children are born in wave 1 and 6 ? 
+tab sibbirth wave, matcell(cellcount)
+matlist cellcount 
+matrix rownames cellcount= 0 1
+matrix colnames cellcount= 1 2 3 4 5 6 
 
-* generate variable for the year of birth
-bysort Idnumber: egen xy=min(wave) if sibbirth==1 
-bysort Idnumber: egen yrsbirth=min(xy)
-replace yrsbirth=-1 if nrsib==0 					// singleton child
 
+tab sibbirth_2 wave, matcell(cellcount2)
+matlist cellcount2 
+matrix rownames cellcount2= 0 1
+matrix colnames cellcount2= 2 3 4 5 
+
+putexcel set vergleich_variablen.xlsx, sheet(tab) replace
+
+putexcel A1 = "Alte variabel 'Sibbirth'"
+
+putexcel A2 = matrix(cellcount), names hcenter
+putexcel A5 = "Neue variable 'Sibbirth2'"
+
+putexcel A6 = matrix(cellcount2), names hcenter
 
 
 				
-
-* lable SDQ-Score-variables
-label var emosymp5 "Emotional symptoms score"
-label var emosymp6 "Emotional symptoms score"
-label var conductprob5 "Conduct problems score"
-label var conductprob6 "Conduct problems score"
-label var hyper5 "Hyper-activity score"
-label var hyper6 "Hyper-activity score"
-label var peerprob5 "Peer problems score"
-label var peerprob6 "Peer problems score"
-label var prosoc5 "Pro-social score"
-label var prosoc6 "Pro-social score"
-label var totalsdq5 "Total difficulties score"
-label var totalsdq6 "Total difficulties score"
-
-use "H:\GUS\_rp_kuehhirt&klein_cd17\data\original\testdata.dta" 
+*use "H:\GUS\_rp_kuehhirt&klein_cd17\data\original\testen.dta" 
 
 * rename missings
 foreach var of varlist 	emosymp5 emosymp6 conductprob5 conductprob6 /// 
@@ -863,7 +907,7 @@ graph box 	`var', 													///
 			asyvar bar(1, color(sand)) marker(1, mcol (sand))		///
 			bar(2, color(emerald)) marker(2, mcol(emerald))			///
 			title ("`z'") ///
-			saving(box`var', replace) 
+			name(box`var', replace) 
 }
 
 * get grc1leg2 (supresses the legends when combining graphs and uses just one)
@@ -872,31 +916,29 @@ findit grc1leg2
 grc1leg2  	boxemosymp5.gph boxconductprob5.gph boxhyper5.gph  		///
 			boxpeerprob5.gph boxprosoc5.gph boxtotalsdq5.gph, 		///
 			title("Distribution of Difficulties in Year 5") 		///
-			saving(boxall_sibbirth5, replace)
+			saving(${wdir}/tables/boxall_sibbirth5, replace)
 			
 			
-			
-			
-*alternatives speichern  
+*** draw boxplot over Sibbirth_2 and Sex year 5
 foreach var of varlist	emosymp5 conductprob5 hyper5 				///
 						peerprob5 prosoc5 totalsdq5 {
 local z: variable label `var'
 graph box 	`var', 													///
-			over(sibbirth, relabel(1 "No sibling" 2 "Sibling")) 	///
+			over(sibbirth_2, relabel(1 "No sibling" 2 "Sibling")) 	///
 			over(kidmale0, relabel(1 "Female" 2 "Male")) 			///
 			ytitle("") 												/// 
 			asyvar bar(1, color(sand)) marker(1, mcol (sand))		///
 			bar(2, color(emerald)) marker(2, mcol(emerald))			///
 			title ("`z'") ///
-			saving(box`var', replace) 
+			name(box`var', replace) 
 }
+
+ 	
 * combine boxplots year 5
 grc1leg2  	boxemosymp5.gph boxconductprob5.gph boxhyper5.gph  		///
 			boxpeerprob5.gph boxprosoc5.gph boxtotalsdq5.gph, 		///
 			title("Distribution of Difficulties in Year 5") 		///
-			name(boxall_sibbirth5, replace)
-graph export "$figures/boxall_sibbirth5$.png"
-			
+			saving(${wdir}/tables/boxall_sibbirth5_2, replace)
 			
 			
 * draw boxplot over Sibbirth and Sex year 6
@@ -930,6 +972,14 @@ foreach var of varlist 	emosymp`j' conductprob`j' hyper`j' 			///
 foreach var of varlist	emosymp5 conductprob5 hyper5 				///
 						peerprob5 prosoc5 totalsdq5 {
 ttest `var' if kidmale0==1, by(sibbirth)
+}
+
+*** Vergleich zu sibbirth_2
+** ttest: comparison of means 
+* between boys with and without sibling in year 5
+foreach var of varlist	emosymp5 conductprob5 hyper5 				///
+						peerprob5 prosoc5 totalsdq5 {
+ttest `var' if kidmale0==1, by(sibbirth_2)
 }
 
 * between girls with and without sibling in year 5
